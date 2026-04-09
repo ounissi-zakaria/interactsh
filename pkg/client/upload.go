@@ -15,7 +15,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/projectdiscovery/interactsh/pkg/server"
+	"github.com/ounissi-zakaria/interactsh/pkg/server"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/utils/errkit"
 )

@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/projectdiscovery/interactsh/pkg/storage"
+	"github.com/ounissi-zakaria/interactsh/pkg/storage"
 	"github.com/rs/xid"
 	"github.com/stretchr/testify/require"
 )

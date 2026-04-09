@@ -43,7 +43,7 @@ func TestSMTPVRFYOnlyReturns252(t *testing.T) {
 	require.Equal(t, "221", smtpCmdCode(t, conn, "QUIT"))
 }
 
-// Regression for https://github.com/projectdiscovery/interactsh/issues/991:
+// Regression for https://github.com/ounissi-zakaria/interactsh/issues/991:
 // VRFY must not return 502 so clients (e.g. curl) can continue to MAIL/DATA.
 func TestSMTPVRFYCommandReturns252(t *testing.T) {
 	store := newTestStorage(t)

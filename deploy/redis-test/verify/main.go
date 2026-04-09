@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/projectdiscovery/interactsh/pkg/client"
-	"github.com/projectdiscovery/interactsh/pkg/server"
+	"github.com/ounissi-zakaria/interactsh/pkg/client"
+	"github.com/ounissi-zakaria/interactsh/pkg/server"
 )
 
 func main() {

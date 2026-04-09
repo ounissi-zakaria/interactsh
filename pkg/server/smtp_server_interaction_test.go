@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Regression suite for https://github.com/projectdiscovery/interactsh/issues/1362
+// Regression suite for https://github.com/ounissi-zakaria/interactsh/issues/1362
 // covering the SMTP path. Each row exercises a different shape of correlation
 // id and parent domain to guard against false-positive matches in ordinary
 // domain labels overwriting legitimate ones, and against alphabet mismatches.

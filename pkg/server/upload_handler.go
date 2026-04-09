@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/interactsh/pkg/storage"
+	"github.com/ounissi-zakaria/interactsh/pkg/storage"
 )
 
 // Capabilities advertises optional server features to clients at registration.

@@ -1,4 +1,4 @@
-module github.com/projectdiscovery/interactsh
+module github.com/ounissi-zakaria/interactsh
 
 go 1.26.0
 

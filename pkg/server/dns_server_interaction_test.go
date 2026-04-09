@@ -13,11 +13,11 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/projectdiscovery/interactsh/pkg/storage"
+	"github.com/ounissi-zakaria/interactsh/pkg/storage"
 	"github.com/stretchr/testify/require"
 )
 
-// Regression suite for https://github.com/projectdiscovery/interactsh/issues/1362.
+// Regression suite for https://github.com/ounissi-zakaria/interactsh/issues/1362.
 // Each row exercises a different shape of correlation id and parent domain to
 // guard against false-positive matches in ordinary domain labels overwriting
 // legitimate ones, and against alphabet mismatches.
