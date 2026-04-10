@@ -75,6 +75,12 @@ func TestXSSHandler(t *testing.T) {
 		if !strings.Contains(string(body), "XMLHttpRequest") {
 			t.Fatalf("expected XSS payload to contain XMLHttpRequest, got: %s", string(body)[:100])
 		}
+		if !strings.Contains(string(body), "//localhost/x/") {
+			t.Fatalf("expected XSS payload to contain //localhost/x/, got: %s", string(body)[:200])
+		}
+		if !strings.Contains(string(body), "/x/") {
+			t.Fatalf("expected XSS payload to contain /x/ path")
+		}
 		if !strings.Contains(string(body), "localStorage") || !strings.Contains(string(body), "sessionStorage") {
 			t.Fatalf("expected XSS payload to contain localStorage/sessionStorage")
 		}

