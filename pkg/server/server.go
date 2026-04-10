@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/projectdiscovery/interactsh/pkg/server/acme"
-	"github.com/projectdiscovery/interactsh/pkg/storage"
+	"github.com/ounissi-zakaria/interactsh/pkg/server/acme"
+	"github.com/ounissi-zakaria/interactsh/pkg/storage"
 	stringsutil "github.com/projectdiscovery/utils/strings"
 )
 
@@ -110,6 +110,10 @@ type Options struct {
 	HeaderServer string
 	// DefaultHTTPResponseFile is a file to serve for all HTTP requests (takes priority over other options)
 	DefaultHTTPResponseFile string
+	// XSSDir is the directory to store XSS pingback HTML files
+	XSSDir string
+	// DiscordWebhook is the Discord webhook URL for XSS pingback notifications
+	DiscordWebhook string
 
 	ACMEStore *acme.Provider
 	Stats     *Metrics

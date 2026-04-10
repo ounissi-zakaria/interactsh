@@ -372,9 +372,11 @@ CONFIG:
    -dr, -dynamic-resp           enable setting up arbitrary response data
    -cr, -custom-records string  custom dns records YAML file for DNS server
    -hi, -http-index string      custom index file for http server
-   -dhr, -default-http-response string  file to serve for all http requests (takes priority over other options)
-   -hd, -http-directory string  directory with files to serve with http server
-   -ds, -disk                   disk based storage
+    -dhr, -default-http-response string  file to serve for all http requests (takes priority over other options)
+    -hd, -http-directory string  directory with files to serve with http server
+    -xd, -xss-dir string         directory to store XSS pingback HTML files
+    -dw, -discord-webhook string Discord webhook URL for XSS pingback notifications
+    -ds, -disk                   disk based storage
    -dsp, -disk-path string      disk storage path
    -csh, -server-header string  custom value of Server header in response
    -dv, -disable-version        disable publishing interactsh version in response header
@@ -647,6 +649,67 @@ To use this feature, `-http-directory` flag can be used which accepts diretory a
 ```bash
 interactsh-server -d hackwithautomation.com -http-directory ./paylods
 ```
+
+## Blind XSS Pingback
+
+When self-hosting, interactsh-server can capture blind XSS interactions. When enabled, the server serves a JavaScript payload at `/` that collects page data and sends it back to a pingback endpoint.
+
+### Setup
+
+Use the `-xd` / `-xss-dir` flag to specify a directory where HTML reports will be saved:
+
+```bash
+interactsh-server -d hackwithautomation.com -xss-dir /tmp/xss-reports
+```
+
+When a victim's browser executes the payload (e.g., via a reflected/stored XSS), the script collects and POSTs the following to `/x/`:
+
+- **URL** — current page URL
+- **Cookies** — `document.cookie`
+- **Domain** — `document.domain`
+- **Referrer** — `document.referrer`
+- **User Agent** — `navigator.userAgent`
+- **Title** — `document.title`
+- **DOM** — `document.documentElement.outerHTML` (up to 50K chars)
+- **localStorage** — all keys
+- **sessionStorage** — all keys
+
+The server saves a formatted HTML report to the xss-dir and responds with `200 OK` (no ID returned to the client). Each report gets a random 16-character hex ID.
+
+### Viewing Reports
+
+Reports are served at `GET /x/{id}`. For example, if a report was saved as `a1b2c3d4e5f6g7h8.html`:
+
+```
+https://hackwithautomation.com/x/a1b2c3d4e5f6g7h8
+```
+
+### Custom Payload
+
+If `-http-index` is also provided, the custom index file content is served as the XSS payload instead of the default one. This allows you to use a custom JS payload while still receiving pingbacks at `/x/`.
+
+### Behind a Reverse Proxy
+
+When running behind nginx, the handler reads the `X-Real-IP` header to capture the real client IP instead of the proxy's IP. Make sure your nginx config includes:
+
+```nginx
+proxy_set_header X-Real-IP $remote_addr;
+```
+
+## Discord Notifications
+
+When a blind XSS pingback is received, the server can send a Discord notification via a webhook URL. Use the `-dw` / `-discord-webhook` flag:
+
+```bash
+interactsh-server -d hackwithautomation.com -xss-dir /tmp/xss-reports -discord-webhook https://discord.com/api/webhooks/.../...
+```
+
+The notification is sent asynchronously (fire-and-forget) so it doesn't add latency to the pingback response. It includes a rich embed with:
+
+- URL, Domain, Page Title
+- User Agent, Cookies
+- Remote IP
+- Direct link to the full HTML report
 
 ![image](https://user-images.githubusercontent.com/8293321/179396480-d5ff8399-8b91-48aa-b21f-c67e40e80945.png)
 
