@@ -4,9 +4,9 @@ import (
 	"net"
 	"time"
 
+	"github.com/ounissi-zakaria/interactsh/pkg/server"
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/interactsh/pkg/server"
 )
 
 type CLIServerOptions struct {
@@ -71,6 +71,8 @@ type CLIServerOptions struct {
 	UploadMaxFiles          int
 	UploadMaxTotalSize      goflags.Size
 	UploadTTL               time.Duration
+	XSSDir                  string
+	DiscordWebhook          string
 }
 
 func (cliServerOptions *CLIServerOptions) AsServerOptions() *server.Options {
@@ -133,6 +135,8 @@ func (cliServerOptions *CLIServerOptions) AsServerOptions() *server.Options {
 		UploadMaxFiles:           cliServerOptions.UploadMaxFiles,
 		UploadMaxTotalSize:       int64(cliServerOptions.UploadMaxTotalSize),
 		UploadTTL:                cliServerOptions.UploadTTL,
+		XSSDir:                   cliServerOptions.XSSDir,
+		DiscordWebhook:           cliServerOptions.DiscordWebhook,
 	}
 }
 

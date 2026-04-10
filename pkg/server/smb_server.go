@@ -5,6 +5,7 @@ import (
 
 	"github.com/Mzack9999/goimpacket/pkg/relay"
 	"github.com/projectdiscovery/gologger"
+
 )
 
 // SMBServer is an in-process SMB2 NTLM hash capture server backed by

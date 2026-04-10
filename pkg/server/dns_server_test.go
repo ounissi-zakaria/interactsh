@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/miekg/dns"
-	"github.com/projectdiscovery/interactsh/pkg/server/acme"
+	"github.com/ounissi-zakaria/interactsh/pkg/server/acme"
 	"github.com/stretchr/testify/require"
 )
 
