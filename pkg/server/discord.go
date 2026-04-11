@@ -38,12 +38,8 @@ const (
 )
 
 func sendDiscordNotification(webhookURL string, data xssPingbackData, req *http.Request) {
-	scheme := "http"
-	if req.TLS != nil {
-		scheme = "https"
-	}
 
-	reportURL := scheme + "://" + req.Host + "/x/" + data.ID
+	reportURL := "https://" + req.Host + "/x/" + data.ID
 
 	var urlVal, domainVal, uaVal, cookieVal, titleVal string
 	for _, kv := range data.Captured {
