@@ -89,7 +89,7 @@ func TestXSSHandler(t *testing.T) {
 
 	t.Run("POST /x saves pingback", func(t *testing.T) {
 		payload := strings.NewReader(`{"url":"https://victim.com/admin","cookie":"session=abc123","domain":"victim.com","referrer":"https://victim.com/","ua":"Mozilla/5.0","title":"Admin Panel","dom":"<html><head><title>Admin</title></head><body><h1>Admin Dashboard</h1></body></html>","localStorage":{"token":"jwt-abc-123","theme":"dark"},"sessionStorage":{"temp":"data","csrf":"xyz789"}}`)
-		resp, err := client.Post(srv.URL+"/x/", "application/json", payload)
+		resp, err := client.Post(srv.URL+"/x/", "text/plain", payload)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -230,7 +230,7 @@ func TestDiscordNotification(t *testing.T) {
 
 	t.Run("POST /x/ triggers Discord notification", func(t *testing.T) {
 		payload := strings.NewReader(`{"url":"https://victim.com/secret","cookie":"sid=xyz","domain":"victim.com","ua":"TestBot/1.0","title":"Secret Page","dom":"<html></html>","localStorage":{},"sessionStorage":{}}`)
-		resp, err := client.Post(srv.URL+"/x/", "application/json", payload)
+		resp, err := client.Post(srv.URL+"/x/", "text/plain", payload)
 		if err != nil {
 			t.Fatal(err)
 		}
