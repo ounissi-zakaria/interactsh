@@ -62,6 +62,7 @@ func sendDiscordNotification(webhookURL string, data xssPingbackData, req *http.
 		{Name: "Report", Value: reportURL, Inline: false},
 		{Name: "Domain", Value: truncate(domainVal, discordMaxFieldValue), Inline: true},
 		{Name: "Title", Value: truncate(titleVal, discordMaxFieldValue), Inline: true},
+		{Name: "Payload ID", Value: data.PayloadID, Inline: true},
 		{Name: "Remote IP", Value: data.RemoteAddress, Inline: true},
 		{Name: "User Agent", Value: truncate(uaVal, discordMaxFieldValue), Inline: false},
 	}

