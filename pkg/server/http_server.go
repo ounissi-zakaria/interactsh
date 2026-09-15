@@ -16,6 +16,7 @@ import (
 	"net/http/httputil"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -35,7 +36,6 @@ type HTTPServer struct {
 	customBanner    string
 	defaultResponse string
 	staticHandler   http.Handler
-	xssPayload      string
 }
 
 type noopLogger struct {
@@ -85,14 +85,14 @@ func NewHTTPServer(options *Options) (*HTTPServer, error) {
 			server.defaultResponse = string(data)
 		}
 	}
-	// Set up XSS payload for "/" endpoint
+	// Set up XSS pingback directory for the "/" payload endpoint
 	if options.XSSDir != "" {
-		server.xssPayload = strings.Replace(defaultXSSPayload, "XSS_SERVER_DOMAIN", options.Domains[0], 1)
-		if server.customBanner != "" {
-			server.xssPayload = server.customBanner
-			server.customBanner = ""
-		}
 		abs, _ := filepath.Abs(options.XSSDir)
+		if options.HTTPDirectory != "" {
+			if httpAbs, _ := filepath.Abs(options.HTTPDirectory); httpAbs == abs || strings.HasPrefix(abs, httpAbs+string(os.PathSeparator)) {
+				gologger.Error().Msgf("xss-dir (%s) is inside http-directory (%s): the %s hit log and reports will be downloadable via /s/", abs, httpAbs, xssHitsFilename)
+			}
+		}
 		if err := os.MkdirAll(abs, 0755); err != nil {
 			return nil, fmt.Errorf("could not create xss directory %s: %s", abs, err)
 		}
@@ -321,6 +321,8 @@ th{background:#16213e;color:#e94560}
 <tr><th>ID</th><td>{{.ID}}</td></tr>
 <tr><th>Timestamp</th><td>{{.Timestamp}}</td></tr>
 <tr><th>Remote Address</th><td>{{.RemoteAddress}}</td></tr>
+<tr><th>Payload ID</th><td>{{.PayloadID}}</td></tr>
+<tr><th>Host</th><td>{{.Host}}</td></tr>
 </table>
 <h2>Request Headers</h2>
 <table>
@@ -415,9 +417,9 @@ func (h *HTTPServer) defaultHandler(w http.ResponseWriter, req *http.Request) {
 		}
 		h.staticHandler.ServeHTTP(w, req)
 	} else if req.URL.Path == "/" && reflection == "" {
-		if h.xssPayload != "" {
+		if h.options.XSSDir != "" {
 			w.Header().Set("Content-Type", "application/javascript")
-			_, _ = fmt.Fprint(w, h.xssPayload)
+			_, _ = fmt.Fprint(w, h.xssPayloadFor(req))
 		} else if h.customBanner != "" {
 			_, _ = fmt.Fprint(w, strings.ReplaceAll(h.customBanner, "{DOMAIN}", domain))
 		} else {
@@ -471,6 +473,8 @@ type xssKV struct {
 
 type xssPingbackData struct {
 	ID             string
+	PayloadID      string
+	Host           string
 	Timestamp      string
 	RemoteAddress  string
 	Headers        []xssKV
@@ -479,6 +483,12 @@ type xssPingbackData struct {
 	LocalStorage   []xssKV
 	SessionStorage []xssKV
 }
+
+// xssReportIDPattern matches only IDs produced by generateXSSID. Any other
+// path segment — traversal fragments, encoded suffixes such as %23 or %00,
+// extensions like hits.jsonl — is rejected, so only generated report files
+// are ever served from XSSDir.
+var xssReportIDPattern = regexp.MustCompile(`^[0-9a-f]{16}$`)
 
 func (h *HTTPServer) xssHandler(w http.ResponseWriter, req *http.Request) {
 	if h.options.XSSDir == "" {
@@ -489,7 +499,7 @@ func (h *HTTPServer) xssHandler(w http.ResponseWriter, req *http.Request) {
 	id := strings.TrimPrefix(req.URL.Path, "/x/")
 
 	if req.Method == http.MethodGet {
-		if id == "" || strings.Contains(id, "/") || strings.Contains(id, "\\") {
+		if !xssReportIDPattern.MatchString(id) {
 			http.NotFound(w, req)
 			return
 		}
@@ -565,6 +575,8 @@ func (h *HTTPServer) xssHandler(w http.ResponseWriter, req *http.Request) {
 
 	data := xssPingbackData{
 		ID:             id,
+		PayloadID:      extractPayloadID(req.Host, h.options.Domains),
+		Host:           req.Host,
 		Timestamp:      time.Now().UTC().Format(time.RFC3339),
 		RemoteAddress:  host,
 		Headers:        headers,
@@ -595,7 +607,11 @@ func (h *HTTPServer) xssHandler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	gologger.Info().Msgf("XSS pingback saved: %s from %s\n", filePath, host)
+	gologger.Info().Msgf("XSS pingback saved: %s from %s (payload-id: %s)\n", filePath, host, data.PayloadID)
+
+	if err := h.appendXSSHit(newXSSHitRecord(data)); err != nil {
+		gologger.Warning().Msgf("Could not append xss hit to %s: %s\n", xssHitsFilename, err)
+	}
 
 	if h.options.DiscordWebhook != "" {
 		go sendDiscordNotification(h.options.DiscordWebhook, data, req)
